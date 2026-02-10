@@ -30,3 +30,5 @@ export function updateSelection(
 
   return null;
 }
+
+console.log("Selected:", selected);

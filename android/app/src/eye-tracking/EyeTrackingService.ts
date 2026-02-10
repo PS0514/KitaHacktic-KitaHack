@@ -51,3 +51,4 @@ export function processFaceLandmarks(landmarks: any[]): EyeTrackingResult {
   return { direction, blink };
 }
 
+console.log("Eye:", direction);
