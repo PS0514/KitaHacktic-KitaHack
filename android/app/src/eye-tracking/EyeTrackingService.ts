@@ -1,3 +1,4 @@
+// EyeTrackingService.ts
 export type EyeDirection = "LEFT" | "RIGHT" | "CENTER" | "BLINK";
 
 export interface EyeTrackingResult {
@@ -5,14 +6,7 @@ export interface EyeTrackingResult {
   blink: boolean;
 }
 
-export function processFaceLandmarks(landmarks: any[]): EyeTrackingResult {
-  // Placeholder logic (to be improved)
-  return {
-    direction: "CENTER",
-    blink: false,
-  };
-}
-
+// Calculate distance between two points
 function distance(a: any, b: any) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
@@ -35,20 +29,22 @@ function getEyeDirection(eye: any[]) {
   return "CENTER";
 }
 
+// Main function
 export function processFaceLandmarks(landmarks: any[]): EyeTrackingResult {
-  const leftEye = [
-    landmarks[33],
-    landmarks[159],
-    landmarks[468],
-    landmarks[133],
-    landmarks[145],
-    landmarks[153],
-  ];
+  // For mock / testing, landmarks can be empty
+  const leftEye = landmarks.length
+    ? [landmarks[33], landmarks[159], landmarks[468], landmarks[133], landmarks[145], landmarks[153]]
+    : [];
 
-  const blink = isBlinking(leftEye);
-  const direction = blink ? "BLINK" : getEyeDirection(leftEye);
+  const blink = leftEye.length ? isBlinking(leftEye) : false;
+  const direction = leftEye.length ? getEyeDirection(leftEye) : "CENTER";
 
   return { direction, blink };
 }
 
-console.log("Eye:", direction);
+// ✅ Mock function for testing without camera
+export function getMockEyeDirection(): EyeTrackingResult {
+  const directions: EyeDirection[] = ["LEFT", "CENTER", "RIGHT", "BLINK"];
+  const random = directions[Math.floor(Math.random() * directions.length)];
+  return { direction: random, blink: random === "BLINK" };
+}

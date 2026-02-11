@@ -1,3 +1,4 @@
+// SelectionController.ts
 let currentTarget: string | null = null;
 let startTime = 0;
 
@@ -23,12 +24,10 @@ export function updateSelection(
     return null;
   }
 
-  if (now - startTime > 1200) {
+  if (now - startTime > 1200) { // 1.2 seconds gaze threshold
     currentTarget = null;
     return target;
   }
 
   return null;
 }
-
-console.log("Selected:", selected);

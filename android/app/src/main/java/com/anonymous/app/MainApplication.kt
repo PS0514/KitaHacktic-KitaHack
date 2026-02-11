@@ -1,4 +1,4 @@
-package com.app
+package com.anonymous.app
 
 import android.app.Application
 import com.facebook.react.PackageList
