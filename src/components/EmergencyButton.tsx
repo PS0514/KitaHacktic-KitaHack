@@ -3,70 +3,56 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  View,
   ViewStyle,
 } from 'react-native';
 
-import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/Feather';
 
 type Props = {
   label: 'HELP' | 'EMERGENCY' | 'PAIN' | 'WATER' | 'FOOD';
   onPressFallback?: () => void;
   isActive?: boolean;
+  isConfirmed?: boolean;
 };
 
 /**
- * Professional Medical Color System
+ * Color system
  */
-function getGradient(label: string): string[] {
-
+function getColor(label: string): string {
   switch (label) {
-
-    case 'EMERGENCY':
-      return ['#ef4444', '#7f1d1d']; // crimson
-
     case 'HELP':
-      return ['#3b82f6', '#1e3a8a']; // medical blue
-
+      return '#3b82f6';
+    case 'EMERGENCY':
+      return '#ef4444';
     case 'PAIN':
-      return ['#f59e0b', '#78350f']; // amber
-
+      return '#f59e0b';
     case 'WATER':
-      return ['#0ea5e9', '#0c4a6e']; // cyan blue
-
+      return '#06b6d4';
     case 'FOOD':
-      return ['#10b981', '#064e3b']; // emerald green
-
+      return '#10b981';
     default:
-      return ['#334155', '#0f172a'];
-
+      return '#3b82f6';
   }
 }
 
 /**
- * Glow color based on urgency
+ * Icon mapping
  */
-function getGlow(label: string): string {
-
+function getIcon(label: string): string {
   switch (label) {
-
-    case 'EMERGENCY':
-      return '#ef4444';
-
     case 'HELP':
-      return '#3b82f6';
-
+      return 'life-buoy';
+    case 'EMERGENCY':
+      return 'alert-triangle';
     case 'PAIN':
-      return '#f59e0b';
-
+      return 'activity';
     case 'WATER':
-      return '#0ea5e9';
-
+      return 'droplet';
     case 'FOOD':
-      return '#10b981';
-
+      return 'coffee';
     default:
-      return '#3b82f6';
-
+      return 'circle';
   }
 }
 
@@ -74,74 +60,83 @@ export function EmergencyButton({
   label,
   onPressFallback,
   isActive = false,
+  isConfirmed = false,
 }: Props) {
 
-  const colors = getGradient(label);
-  const glowColor = getGlow(label);
+  const color = getColor(label);
+  const icon = getIcon(label);
+  const glow = isActive || isConfirmed;
 
   return (
-
     <TouchableOpacity
       onPress={onPressFallback}
       activeOpacity={0.85}
+      style={styles.container}
     >
-
-      <LinearGradient
-        colors={colors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+      <View
         style={[
           styles.button,
-          isActive && {
-            shadowColor: glowColor,
+
+          {
+            borderColor: color,
+          },
+
+          glow && {
+            shadowColor: color,
             shadowOpacity: 0.9,
-            elevation: 14,
+            shadowRadius: 18,
+            elevation: 16,
+            backgroundColor: color + '15',
           } as ViewStyle,
         ]}
       >
+        <Icon
+          name={icon}
+          size={22}
+          color={color}
+          style={styles.icon}
+        />
 
-        <Text style={styles.text}>
+        <Text style={[styles.text, { color }]}>
           {label}
         </Text>
 
-      </LinearGradient>
-
+      </View>
     </TouchableOpacity>
-
   );
 }
 
 const styles = StyleSheet.create({
 
+  container: {
+    flex: 1,
+  },
+
   button: {
 
-    minWidth: 110,
+    height: 72,
 
-    paddingHorizontal: 22,
-    paddingVertical: 14,
+    borderRadius: 14,
 
-    borderRadius: 40,
+    borderWidth: 1.5,
 
     alignItems: 'center',
     justifyContent: 'center',
 
-    shadowColor: '#000',
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
+    backgroundColor: 'transparent',
 
-    elevation: 8,
+    marginHorizontal: 6,
+
+  },
+
+  icon: {
+    marginBottom: 6,
   },
 
   text: {
-
-    color: '#ffffff',
-
-    fontSize: 14,
-    fontWeight: '700',
-
-    letterSpacing: 1,
-
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
 
 });

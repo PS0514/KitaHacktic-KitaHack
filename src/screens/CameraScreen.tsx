@@ -5,33 +5,62 @@ import {
   StyleSheet,
   View,
   Text,
-  Platform,
+  TouchableOpacity,
 } from 'react-native';
 
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { EmergencyButton } from '../components/EmergencyButton';
 import { useDwellSelection } from '../hooks/useDwellSelection';
 import { Reticle } from '../components/Reticle';
+import { Header } from '../components/Header';
 
-type EmergencyLabel =
-  | 'HELP'
-  | 'EMERGENCY'
-  | 'PAIN'
-  | 'WATER'
-  | 'FOOD';
+/**
+ * Match Header height
+ */
+const HEADER_HEIGHT = 74;
+
+/**
+ * Keyword type system
+ */
+type Keyword = {
+  id: string;
+  label: 'HELP' | 'EMERGENCY' | 'PAIN' | 'WATER' | 'FOOD';
+  type: 'static' | 'dynamic';
+};
 
 export function CameraScreen() {
 
   const device = useCameraDevice('back');
-  const insets = useSafeAreaInsets();
 
   const [hasPermission, setHasPermission] = useState(false);
 
   /**
-   * Dwell selection system
+   * STATIC KEYWORDS (always present)
    */
+  const staticKeywords: Keyword[] = [
+    { id: 'HELP', label: 'HELP', type: 'static' },
+    { id: 'EMERGENCY', label: 'EMERGENCY', type: 'static' },
+    { id: 'PAIN', label: 'PAIN', type: 'static' },
+    { id: 'WATER', label: 'WATER', type: 'static' },
+    { id: 'FOOD', label: 'FOOD', type: 'static' },
+  ];
+
+  /**
+   * DYNAMIC KEYWORDS (future AI / teammate control)
+   */
+  const [dynamicKeywords, setDynamicKeywords] = useState<Keyword[]>([]);
+
+  /**
+   * Example future usage (teammate can modify)
+   */
+  /*
+  useEffect(() => {
+    setDynamicKeywords([
+      { id: 'MEDICINE', label: 'HELP', type: 'dynamic' },
+    ]);
+  }, []);
+  */
+
   const {
     active,
     confirmedId,
@@ -44,29 +73,16 @@ export function CameraScreen() {
     },
   });
 
-  /**
-   * Camera Permission Init
-   */
   useEffect(() => {
-
     async function init() {
-
       const permission = await Camera.requestCameraPermission();
-
       setHasPermission(permission === 'granted');
-
     }
-
     init();
-
   }, []);
 
-  /**
-   * Emergency Button Handler
-   */
   const handleEmergency = useCallback(
-
-    (label: EmergencyLabel) => {
+    (label: Keyword['label']) => {
 
       if (cooldown) return;
 
@@ -77,12 +93,23 @@ export function CameraScreen() {
       });
 
     },
-
-    [cooldown, startDwell]
-
+    [cooldown, startDwell],
   );
 
   const showCamera = hasPermission && device != null;
+
+  /**
+   * Render keyword button
+   */
+  const renderKeyword = (keyword: Keyword) => (
+    <EmergencyButton
+      key={keyword.id}
+      label={keyword.label}
+      isActive={active?.id === keyword.id}
+      isConfirmed={confirmedId === keyword.id}
+      onPressFallback={() => handleEmergency(keyword.label)}
+    />
+  );
 
   return (
 
@@ -94,130 +121,85 @@ export function CameraScreen() {
         backgroundColor="transparent"
       />
 
-      {/* ========================= */}
-      {/* Frosted Glass Header */}
-      {/* ========================= */}
+      <Header />
 
       <View
         style={[
-          styles.headerContainer,
+          styles.content,
           {
-            paddingTop: insets.top + 8,
+            paddingTop: HEADER_HEIGHT + 8,
           },
         ]}
       >
 
-        <View style={styles.headerGlass}>
+        {/* KEYWORD PANEL */}
+        <View style={styles.panel}>
 
-          <Text style={styles.title}>
-            MindLens
-          </Text>
-
-          <View style={styles.statusRow}>
-
-            <View style={styles.greenDot} />
-
-            <Text style={styles.statusText}>
-              SYSTEM ACTIVE
-            </Text>
-
+          {/* STATIC KEYWORDS */}
+          <View style={styles.buttonRow}>
+            {staticKeywords.slice(0, 3).map(renderKeyword)}
           </View>
+
+          <View style={[styles.buttonRow, styles.buttonRowBottom]}>
+            {staticKeywords.slice(3, 5).map(renderKeyword)}
+          </View>
+
+          {/* DYNAMIC KEYWORDS */}
+          {dynamicKeywords.length > 0 && (
+            <>
+              <Text style={styles.dynamicTitle}>
+                Suggested
+              </Text>
+
+              <View style={styles.buttonRow}>
+                {dynamicKeywords.map(renderKeyword)}
+              </View>
+            </>
+          )}
 
         </View>
 
-      </View>
 
+        {/* CAMERA CARD — UNCHANGED SIZE */}
+        <View style={styles.cameraCard}>
 
-      {/* ========================= */}
-      {/* Camera Layer */}
-      {/* ========================= */}
+          <View style={styles.cameraInner}>
 
-      <View style={styles.cameraWrapper}>
+            {showCamera ? (
+              <Camera
+                style={StyleSheet.absoluteFill}
+                device={device}
+                isActive
+              />
+            ) : (
+              <View style={styles.permissionPlaceholder}>
+                <Text style={styles.placeholderText}>
+                  Camera permission required
+                </Text>
+              </View>
+            )}
 
-        {showCamera ? (
+            <Reticle progress={active ? progress : 0} />
 
-          <Camera
-            style={StyleSheet.absoluteFill}
-            device={device}
-            isActive={true}
-            photo={false}
-            video={false}
-          />
+            <View style={styles.readyBadge}>
+              <Text style={styles.badgeText}>
+                Ready
+              </Text>
+            </View>
 
-        ) : (
+            <View style={styles.detectedBadge}>
+              <Text style={styles.badgeText}>
+                0 objects detected
+              </Text>
+            </View>
 
-          <View style={styles.permissionPlaceholder}>
-            <Text style={styles.placeholderText}>
-              Camera permission required
-            </Text>
-          </View>
-
-        )}
-
-
-        {/* ========================= */}
-        {/* Vision HUD Reticle */}
-        {/* ========================= */}
-
-        <Reticle progress={active ? progress : 0} />
-
-
-        {/* ========================= */}
-        {/* Emergency Control Panel */}
-        {/* ========================= */}
-
-        <View style={styles.panel}>
-
-          {/* Row 1 */}
-
-          <View style={styles.row}>
-
-            <EmergencyButton
-              label="HELP"
-              isActive={active?.id === 'HELP'}
-              isConfirmed={confirmedId === 'HELP'}
-              dwellProgress={active?.id === 'HELP' ? progress : 0}
-              onPressFallback={() => handleEmergency('HELP')}
-            />
-
-            <EmergencyButton
-              label="EMERGENCY"
-              isActive={active?.id === 'EMERGENCY'}
-              isConfirmed={confirmedId === 'EMERGENCY'}
-              dwellProgress={active?.id === 'EMERGENCY' ? progress : 0}
-              onPressFallback={() => handleEmergency('EMERGENCY')}
-            />
-
-            <EmergencyButton
-              label="PAIN"
-              isActive={active?.id === 'PAIN'}
-              isConfirmed={confirmedId === 'PAIN'}
-              dwellProgress={active?.id === 'PAIN' ? progress : 0}
-              onPressFallback={() => handleEmergency('PAIN')}
-            />
-
-          </View>
-
-
-          {/* Row 2 */}
-
-          <View style={styles.rowCenter}>
-
-            <EmergencyButton
-              label="WATER"
-              isActive={active?.id === 'WATER'}
-              isConfirmed={confirmedId === 'WATER'}
-              dwellProgress={active?.id === 'WATER' ? progress : 0}
-              onPressFallback={() => handleEmergency('WATER')}
-            />
-
-            <EmergencyButton
-              label="FOOD"
-              isActive={active?.id === 'FOOD'}
-              isConfirmed={confirmedId === 'FOOD'}
-              dwellProgress={active?.id === 'FOOD' ? progress : 0}
-              onPressFallback={() => handleEmergency('FOOD')}
-            />
+            <View style={styles.startButtonContainer}>
+              <TouchableOpacity style={styles.startButton}>
+                <Text style={styles.startButtonText}>
+                  Start Scanning
+                </Text>
+              </TouchableOpacity>
+            </View>
 
           </View>
 
@@ -231,8 +213,6 @@ export function CameraScreen() {
 
 }
 
-
-
 const styles = StyleSheet.create({
 
   safeArea: {
@@ -240,164 +220,113 @@ const styles = StyleSheet.create({
     backgroundColor: '#020617',
   },
 
-
-  /**
-   * Header
-   */
-  headerContainer: {
-
-    position: 'absolute',
-
-    width: '100%',
-
-    alignItems: 'center',
-
-    zIndex: 50,
-
-  },
-
-
-  headerGlass: {
-
-    backgroundColor: 'rgba(15,23,42,0.55)',
-
-    borderRadius: 22,
-
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-
-    alignItems: 'center',
-
-    borderWidth: 0.6,
-    borderColor: 'rgba(255,255,255,0.18)',
-
-  },
-
-
-  title: {
-
-    color: '#e2e8f0',
-
-    fontSize: 22,
-
-    fontWeight: '700',
-
-    letterSpacing: 0.6,
-
-  },
-
-
-  statusRow: {
-
-    flexDirection: 'row',
-
-    alignItems: 'center',
-
-    marginTop: 4,
-
-  },
-
-
-  greenDot: {
-
-    width: 6,
-    height: 6,
-
-    borderRadius: 3,
-
-    backgroundColor: '#22c55e',
-
-    marginRight: 6,
-
-  },
-
-
-  statusText: {
-
-    color: '#22c55e',
-
-    fontSize: 11,
-
-    fontWeight: '700',
-
-    letterSpacing: 1,
-
-  },
-
-
-  /**
-   * Camera Layer
-   */
-
-  cameraWrapper: {
-
+  content: {
     flex: 1,
-
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    gap: 16,
   },
-
-
-  /**
-   * Emergency Panel
-   */
 
   panel: {
-
-    position: 'absolute',
-
-    top: 110,
-
-    left: 16,
-    right: 16,
-
-    backgroundColor: 'rgba(15,23,42,0.82)',
-
-    borderRadius: 26,
-
-    padding: 18,
-
-    borderWidth: 0.6,
-    borderColor: 'rgba(255,255,255,0.1)',
-
+    backgroundColor: '#020617',
+    borderRadius: 28,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(30,64,175,0.4)',
   },
 
-
-  row: {
-
+  buttonRow: {
     flexDirection: 'row',
-
     justifyContent: 'space-between',
-
-    marginBottom: 14,
-
+    alignItems: 'center',
   },
 
-
-  rowCenter: {
-
-    flexDirection: 'row',
-
-    justifyContent: 'center',
-
-    gap: 12,
-
+  buttonRowBottom: {
+    marginTop: 12,
+    paddingHorizontal: 28,
   },
 
+  dynamicTitle: {
+    color: '#94a3b8',
+    fontSize: 13,
+    marginTop: 16,
+    marginBottom: 6,
+    marginLeft: 6,
+  },
+
+  cameraCard: {
+    flex: 1,
+    backgroundColor: '#0b1220',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.35)',
+    shadowColor: '#3b82f6',
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 0 },
+  },
+
+  cameraInner: {
+    flex: 1,
+  },
+
+  readyBadge: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15,23,42,0.9)',
+  },
+
+  detectedBadge: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15,23,42,0.9)',
+  },
+
+  badgeText: {
+    color: '#e5e7eb',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  startButtonContainer: {
+    position: 'absolute',
+    bottom: 18,
+    alignSelf: 'center',
+  },
+
+  startButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: '#3b82f6',
+    shadowColor: '#3b82f6',
+    shadowOpacity: 0.8,
+    shadowRadius: 18,
+  },
+
+  startButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
 
   permissionPlaceholder: {
-
     flex: 1,
-
     justifyContent: 'center',
-
     alignItems: 'center',
-
   },
 
-
   placeholderText: {
-
     color: '#cbd5e1',
-
   },
 
 });
