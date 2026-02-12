@@ -49,34 +49,36 @@ export function CameraScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const currentKeywords = getActiveKeywords(detectedFromCV);
-  const itemCount =
-    scanMode === 'SCANNING_OPTIONS' ? currentKeywords.length :
-    scanMode === 'SCANNING_SENTENCES' ? geminiSentences.length : 0;
+  // If isProcessing is true, we set itemCount to 0 to "Freeze" the scanner
+  const itemCount = isProcessing ? 0 : (
+      scanMode === 'SCANNING_OPTIONS' ? currentKeywords.length :
+      scanMode === 'SCANNING_SENTENCES' ? geminiSentences.length : 0
+  );
 
-  const { index, reset } = useSwitchScan(itemCount, 1500);
+  const { index, reset } = useSwitchScan(itemCount, isProcessing, 1500);
 
   const isSpeakingRef = React.useRef(false);
 
   const handleSwitchPress = async () => {
-    if (scanMode === 'IDLE' || isProcessing || isSpeakingRef.current) return;
+    if (scanMode === 'IDLE' || isProcessing) return;
 
     const selectedKeyword = currentKeywords[index];
     const finalSentence = geminiSentences[index];
 
     if (scanMode === 'SCANNING_OPTIONS') {
-      setIsProcessing(true);
+      setIsProcessing(true); // Locks the UI and freezes the scanner index
 
-      // Start speaking immediately
       speak(selectedKeyword.label.toLowerCase());
 
-      // Increase this delay to "Stay" on the button screen longer
-      // 1500ms is usually enough for the voice to finish the keyword
+      // STAY HERE for 1.5s - The highlight stays on the chosen keyword
       setTimeout(async () => {
         setScanMode('LOADING_GEMINI');
 
         try {
           const phrases = await generatePatientPhrases(selectedKeyword.label);
           setGeminiSentences(phrases);
+
+          // ONLY RESET HERE, right before showing the new list of sentences
           reset();
           setScanMode('SCANNING_SENTENCES');
         } catch (error) {
@@ -88,16 +90,15 @@ export function CameraScreen() {
     }
 
     else if (scanMode === 'SCANNING_SENTENCES') {
-      setIsProcessing(true);
+      setIsProcessing(true); // Freezes the highlight on the selected sentence
       speak(finalSentence);
 
-      // Stay on the sentence list for 2 seconds while it speaks
-      // This prevents the "black screen" jump during audio
       setTimeout(() => {
         setIsProcessing(false);
-        setScanMode('IDLE');
+        setScanMode('IDLE'); // Reset back to start
         setGeminiSentences([]);
-      }, 2000);
+        reset();
+      }, 2500);
     }
   };
 
@@ -165,7 +166,7 @@ export function CameraScreen() {
                   <Camera
                     style={StyleSheet.absoluteFill}
                     device={device}
-                    isActive={scanMode === 'IDLE' || scanMode === 'SCANNING_OPTIONS'}
+                    isActive={scanMode === 'IDLE' || scanMode === 'SCANNING_OPTIONS' || isProcessing}
                     pixelFormat="yuv"
                     audio={false}
                     photo={false}
