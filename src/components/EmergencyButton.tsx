@@ -1,94 +1,147 @@
-import React, { memo } from 'react';
+import React from 'react';
 import {
-  Animated,
-  StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  StyleSheet,
+  ViewStyle,
 } from 'react-native';
 
+import LinearGradient from 'react-native-linear-gradient';
+
 type Props = {
-  label: string;
-  isActive: boolean;
-  isConfirmed: boolean;
-  dwellProgress: number;
+  label: 'HELP' | 'EMERGENCY' | 'PAIN' | 'WATER' | 'FOOD';
   onPressFallback?: () => void;
+  isActive?: boolean;
 };
 
-function EmergencyButtonComponent({
+/**
+ * Professional Medical Color System
+ */
+function getGradient(label: string): string[] {
+
+  switch (label) {
+
+    case 'EMERGENCY':
+      return ['#ef4444', '#7f1d1d']; // crimson
+
+    case 'HELP':
+      return ['#3b82f6', '#1e3a8a']; // medical blue
+
+    case 'PAIN':
+      return ['#f59e0b', '#78350f']; // amber
+
+    case 'WATER':
+      return ['#0ea5e9', '#0c4a6e']; // cyan blue
+
+    case 'FOOD':
+      return ['#10b981', '#064e3b']; // emerald green
+
+    default:
+      return ['#334155', '#0f172a'];
+
+  }
+}
+
+/**
+ * Glow color based on urgency
+ */
+function getGlow(label: string): string {
+
+  switch (label) {
+
+    case 'EMERGENCY':
+      return '#ef4444';
+
+    case 'HELP':
+      return '#3b82f6';
+
+    case 'PAIN':
+      return '#f59e0b';
+
+    case 'WATER':
+      return '#0ea5e9';
+
+    case 'FOOD':
+      return '#10b981';
+
+    default:
+      return '#3b82f6';
+
+  }
+}
+
+export function EmergencyButton({
   label,
-  isActive,
-  isConfirmed,
-  dwellProgress,
   onPressFallback,
+  isActive = false,
 }: Props) {
-  const defaultColor =
-    label === 'HELP' || label === 'PAIN'
-      ? '#ef4444'
-      : '#f97316';
 
-  const borderColor = isConfirmed
-    ? '#22c55e'
-    : isActive
-    ? '#3b82f6'
-    : defaultColor;
-
-  const progressStyle = {
-    opacity: isActive ? 1 : 0,
-    transform: [
-      {
-        scale: 0.6 + dwellProgress * 0.4,
-      },
-    ],
-  };
+  const colors = getGradient(label);
+  const glowColor = getGlow(label);
 
   return (
-    <TouchableOpacity activeOpacity={0.8} onPress={onPressFallback}>
-      <View style={[styles.button, { borderColor }]}>
-        <Text style={styles.text}>{label}</Text>
 
-        {isActive && (
-          <Animated.View
-            style={[
-              styles.progressRing,
-              progressStyle,
-              { borderColor: '#3b82f6' },
-            ]}
-          />
-        )}
-      </View>
+    <TouchableOpacity
+      onPress={onPressFallback}
+      activeOpacity={0.85}
+    >
+
+      <LinearGradient
+        colors={colors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[
+          styles.button,
+          isActive && {
+            shadowColor: glowColor,
+            shadowOpacity: 0.9,
+            elevation: 14,
+          } as ViewStyle,
+        ]}
+      >
+
+        <Text style={styles.text}>
+          {label}
+        </Text>
+
+      </LinearGradient>
+
     </TouchableOpacity>
+
   );
 }
 
-export const EmergencyButton = memo(EmergencyButtonComponent);
-
 const styles = StyleSheet.create({
+
   button: {
-    minWidth: 120,
-    paddingHorizontal: 20,
+
+    minWidth: 110,
+
+    paddingHorizontal: 22,
     paddingVertical: 14,
-    borderRadius: 30,
-    borderWidth: 3,
-    backgroundColor: 'rgba(15,23,42,0.9)',
+
+    borderRadius: 40,
+
     alignItems: 'center',
     justifyContent: 'center',
+
+    shadowColor: '#000',
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+
+    elevation: 8,
   },
 
   text: {
+
     color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+
+    fontSize: 14,
+    fontWeight: '700',
+
+    letterSpacing: 1,
+
   },
 
-  progressRing: {
-    position: 'absolute',
-    top: -6,
-    left: -6,
-    right: -6,
-    bottom: -6,
-    borderRadius: 40,
-    borderWidth: 3,
-  },
 });
