@@ -1,16 +1,17 @@
+// src/hooks/useSwitchScan.ts
 import { useEffect, useState } from 'react';
 
-export function useSwitchScan(
-  count: number,
-  intervalMs = 1200
-) {
+export function useSwitchScan(count: number, intervalMs = 1200) {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    if (count === 0) return;
+    if (count <= 0) {
+      setIndex(0);
+      return;
+    }
 
     const timer = setInterval(() => {
-      console.log("⏰ TICK! Index moving..."); // <--- Add this log
+        console.log("⏰ TICK! Index moving...");
       setIndex(prev => (prev + 1) % count);
     }, intervalMs);
 

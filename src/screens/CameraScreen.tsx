@@ -9,79 +9,94 @@ import {
   ActivityIndicator,
 } from 'react-native';
 
-import { Camera, useCameraDevice } from 'react-native-vision-camera';
+import { Camera, useCameraDevice, useCameraFormat } from 'react-native-vision-camera';
 import { EmergencyButton } from '../components/EmergencyButton';
 import { Header } from '../components/Header';
 import { useSwitchScan } from '../hooks/useSwitchScan'; // Ensure this path is correct
 import SwitchOptionList from '../components/SwitchOptionList'; // Reuse this for sentences
+import { generatePatientPhrases } from '../logic/geminiService';
+import { useVoiceOut } from '../hooks/useVoiceOut';
+import { getActiveKeywords } from '../logic/aiManager';
 
 /** Modes for our State Machine */
 type ScanMode = 'IDLE' | 'SCANNING_OPTIONS' | 'LOADING_GEMINI' | 'SCANNING_SENTENCES';
 
 const HEADER_HEIGHT = 74;
 
+// Update Keyword type to handle dynamic labels from CV
 type Keyword = {
   id: string;
-  label: 'HELP' | 'EMERGENCY' | 'PAIN' | 'WATER' | 'FOOD';
+  label: string;
 };
 
 export function CameraScreen() {
   const device = useCameraDevice('back');
+
+  const format = useCameraFormat(device, [
+      { videoResolution: { width: 1280, height: 720 } },
+      { videoResolution: { width: 640, height: 480 } },
+      { fps: 30 }
+    ]);
+
   const [hasPermission, setHasPermission] = useState(false);
+
+  const { speak } = useVoiceOut();
+  const [detectedFromCV, setDetectedFromCV] = useState<string[]>(['Cup', 'Phone']); // Mocked from CV Dev branch
 
   // 1. STATE MACHINE
   const [scanMode, setScanMode] = useState<ScanMode>('IDLE');
   const [geminiSentences, setGeminiSentences] = useState<string[]>([]);
 
   // 2. DATA (The 5 Buttons you see on screen)
-  const staticKeywords: Keyword[] = [
-    { id: 'HELP', label: 'HELP' },
-    { id: 'EMERGENCY', label: 'EMERGENCY' },
-    { id: 'PAIN', label: 'PAIN' },
-    { id: 'WATER', label: 'WATER' },
-    { id: 'FOOD', label: 'FOOD' },
-  ];
-
-  // 3. SCANNER LOGIC
-  // Determine what we are counting: 5 buttons OR 3 sentences
+  // Logic updated: Combine 3 static keywords with top 2 dynamic objects
+  const currentKeywords = getActiveKeywords(detectedFromCV);
   const itemCount =
-    scanMode === 'SCANNING_OPTIONS' ? staticKeywords.length :
+    scanMode === 'SCANNING_OPTIONS' ? currentKeywords.length :
     scanMode === 'SCANNING_SENTENCES' ? geminiSentences.length : 0;
+  // 3. SCANNER LOGIC - Removed the onTick callback to prevent overlaps
+    const { index, reset } = useSwitchScan(itemCount, 1500);
 
-  const { index, reset } = useSwitchScan(itemCount, 1500); // 1.5s speed
+    // 4. CONFIRM ACTION (The Switch Press)
+    const [isProcessing, setIsProcessing] = useState(false);
+    const isSpeakingRef = React.useRef(false);
 
-  // 4. CONFIRM ACTION (The Switch Press)
-  const handleSwitchPress = () => {
-    if (scanMode === 'IDLE') return; // Do nothing if not started
+    const handleSwitchPress = async () => {
+      if (scanMode === 'IDLE' || isSpeakingRef.current) return;
 
-    if (scanMode === 'SCANNING_OPTIONS') {
-      // User selected one of the 5 top buttons
-      const selectedKeyword = staticKeywords[index];
-      console.log("SELECTED:", selectedKeyword.label);
-
-      setScanMode('LOADING_GEMINI');
-
-      // MOCK GEMINI CALL (Replace with real API later)
-      setTimeout(() => {
-        setGeminiSentences([
-          `I need ${selectedKeyword.label} immediately.`,
-          `Where is the ${selectedKeyword.label}?`,
-          `Please bring me ${selectedKeyword.label}.`
-        ]);
-        reset(); // Reset scanner to 0
-        setScanMode('SCANNING_SENTENCES');
-      }, 2000);
-    }
-    else if (scanMode === 'SCANNING_SENTENCES') {
-      // User selected a final sentence
+      const selectedKeyword = currentKeywords[index];
       const finalSentence = geminiSentences[index];
-      console.log("FINAL SENTENCE:", finalSentence);
 
-      // Reset everything
-      setScanMode('IDLE');
-      setGeminiSentences([]);
-    }
-  };
+      if (scanMode === 'SCANNING_OPTIONS') {
+        console.log("SELECTED:", selectedKeyword.label); // DEBUG LOG
+
+        isSpeakingRef.current = true;
+        speak(selectedKeyword.label.toLowerCase());
+
+        setScanMode('LOADING_GEMINI');
+        try {
+          const phrases = await generatePatientPhrases(selectedKeyword.label);
+          setGeminiSentences(phrases);
+          reset();
+          setScanMode('SCANNING_SENTENCES');
+        } catch (error) {
+          setScanMode('IDLE');
+        } finally {
+          // Unlock after 500ms to allow next interaction
+          setTimeout(() => { isSpeakingRef.current = false; }, 500);
+        }
+      }
+      else if (scanMode === 'SCANNING_SENTENCES') {
+        console.log("FINAL SENTENCE:", finalSentence); // DEBUG LOG
+
+        isSpeakingRef.current = true;
+        speak(finalSentence);
+
+        setScanMode('IDLE');
+        setGeminiSentences([]);
+
+        setTimeout(() => { isSpeakingRef.current = false; }, 500);
+      }
+    };
 
   useEffect(() => {
     async function init() {
@@ -92,6 +107,14 @@ export function CameraScreen() {
   }, []);
 
   const showCamera = hasPermission && device != null;
+  if (!hasPermission || device == null) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" />
+        <Text style={styles.loadingText}>Initializing Camera...</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -113,10 +136,10 @@ export function CameraScreen() {
           <View style={styles.panel}>
             {/* Row 1: HELP, EMERGENCY, PAIN */}
             <View style={styles.buttonRow}>
-              {staticKeywords.slice(0, 3).map((kw, i) => (
+              {currentKeywords.slice(0, 3).map((kw, i) => (
                 <EmergencyButton
                   key={kw.id}
-                  label={kw.label}
+                  label={kw.label as any}
                   onPressFallback={() => {}}
                   // Highlight logic: Are we scanning options? Is this the current index?
                   isScanning={scanMode === 'SCANNING_OPTIONS' && index === i}
@@ -124,12 +147,12 @@ export function CameraScreen() {
               ))}
             </View>
 
-            {/* Row 2: WATER, FOOD */}
+            {/* Row 2: Dynamic Objects (e.g., CUP, PHONE) */}
             <View style={[styles.buttonRow, styles.buttonRowBottom]}>
-              {staticKeywords.slice(3, 5).map((kw, i) => (
+              {currentKeywords.slice(3, 5).map((kw, i) => (
                 <EmergencyButton
                   key={kw.id}
-                  label={kw.label}
+                  label={kw.label as any}
                   onPressFallback={() => {}}
                   // Offset index by 3 because this is the second row
                   isScanning={scanMode === 'SCANNING_OPTIONS' && index === (i + 3)}
@@ -145,7 +168,19 @@ export function CameraScreen() {
             {/* SCENARIO A: CAMERA (Default) */}
             {(scanMode === 'IDLE' || scanMode === 'SCANNING_OPTIONS') && (
               <View style={styles.cameraInner}>
-                {showCamera && <Camera style={StyleSheet.absoluteFill} device={device} isActive={true} />}
+                {showCamera && (
+                  <Camera
+                    style={StyleSheet.absoluteFill}
+                    device={device}
+                    isActive={scanMode === 'IDLE' || scanMode === 'SCANNING_OPTIONS'}
+                    pixelFormat="yuv"
+                    audio={false}
+                    photo={false}
+                    video={false}
+                    enableLocation={false}
+                    resizeMode="cover"
+                  />
+                )}
 
                 {/* Visual Feedback for Scanning */}
                 {scanMode === 'SCANNING_OPTIONS' && (
