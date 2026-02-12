@@ -1,197 +1,403 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  LayoutChangeEvent,
   SafeAreaView,
   StatusBar,
   StyleSheet,
   View,
   Text,
+  Platform,
 } from 'react-native';
+
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmergencyButton } from '../components/EmergencyButton';
 import { useDwellSelection } from '../hooks/useDwellSelection';
-import { speakObject } from '../utils/speakObject';
+import { Reticle } from '../components/Reticle';
 
-const SELECTION_RADIUS = 60;
+type EmergencyLabel =
+  | 'HELP'
+  | 'EMERGENCY'
+  | 'PAIN'
+  | 'WATER'
+  | 'FOOD';
 
 export function CameraScreen() {
+
   const device = useCameraDevice('back');
   const insets = useSafeAreaInsets();
 
   const [hasPermission, setHasPermission] = useState(false);
-  const [layout, setLayout] = useState({ width: 0, height: 0 });
 
-  const { active, confirmedId, progress, startDwell, cooldown } = useDwellSelection({
+  /**
+   * Dwell selection system
+   */
+  const {
+    active,
+    confirmedId,
+    progress,
+    startDwell,
+    cooldown,
+  } = useDwellSelection({
     onConfirm: payload => {
-      speakObject(payload.label);
+      console.log('Confirmed:', payload.label);
     },
   });
 
+  /**
+   * Camera Permission Init
+   */
   useEffect(() => {
-    let isMounted = true;
-    const requestPermission = async () => {
-      const status = await Camera.requestCameraPermission();
-      if (isMounted) setHasPermission(status === 'granted');
-    };
-    requestPermission();
-    return () => { isMounted = false; };
+
+    async function init() {
+
+      const permission = await Camera.requestCameraPermission();
+
+      setHasPermission(permission === 'granted');
+
+    }
+
+    init();
+
   }, []);
 
-  const handleLayout = useCallback((e: LayoutChangeEvent) => {
-    const { width, height } = e.nativeEvent.layout;
-    setLayout({ width, height });
-  }, []);
+  /**
+   * Emergency Button Handler
+   */
+  const handleEmergency = useCallback(
 
-  const selectionCenter = useMemo(() => ({
-    x: layout.width / 2,
-    y: layout.height / 2,
-  }), [layout.width, layout.height]);
+    (label: EmergencyLabel) => {
 
-  const handleEmergency = useCallback((label: 'HELP' | 'PAIN') => {
-    speakObject(label);
-    if (cooldown) return;
-    startDwell({ id: label, type: 'emergency', label });
-  }, [cooldown, startDwell]);
+      if (cooldown) return;
+
+      startDwell({
+        id: label,
+        type: 'emergency',
+        label,
+      });
+
+    },
+
+    [cooldown, startDwell]
+
+  );
 
   const showCamera = hasPermission && device != null;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" translucent />
 
-      {/* HEADER: Branding only */}
-      <View style={[styles.headerContainer, { paddingTop: insets.top + 10 }]}>
-        <View style={styles.branding}>
-          <Text style={styles.title}>MindLens</Text>
+    <SafeAreaView style={styles.safeArea}>
+
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
+
+      {/* ========================= */}
+      {/* Frosted Glass Header */}
+      {/* ========================= */}
+
+      <View
+        style={[
+          styles.headerContainer,
+          {
+            paddingTop: insets.top + 8,
+          },
+        ]}
+      >
+
+        <View style={styles.headerGlass}>
+
+          <Text style={styles.title}>
+            MindLens
+          </Text>
+
           <View style={styles.statusRow}>
+
             <View style={styles.greenDot} />
-            <Text style={styles.statusText}>Active</Text>
+
+            <Text style={styles.statusText}>
+              SYSTEM ACTIVE
+            </Text>
+
           </View>
+
         </View>
+
       </View>
 
-      {/* CAMERA CONTAINER */}
-      <View style={styles.cameraWrapper} onLayout={handleLayout}>
+
+      {/* ========================= */}
+      {/* Camera Layer */}
+      {/* ========================= */}
+
+      <View style={styles.cameraWrapper}>
+
         {showCamera ? (
+
           <Camera
             style={StyleSheet.absoluteFill}
             device={device}
             isActive={true}
+            photo={false}
+            video={false}
           />
+
         ) : (
+
           <View style={styles.permissionPlaceholder}>
-            <Text style={styles.placeholderText}>Camera permission required</Text>
+            <Text style={styles.placeholderText}>
+              Camera permission required
+            </Text>
           </View>
+
         )}
 
-        {/* BUTTON OVERLAYS: Placed inside camera view corners */}
-        <View style={styles.buttonOverlayContainer} pointerEvents="box-none">
-          <EmergencyButton
-            label="HELP"
-            isActive={active?.id === 'HELP'}
-            isConfirmed={confirmedId === 'HELP'}
-            dwellProgress={active?.id === 'HELP' ? progress : 0}
-            onPressFallback={() => handleEmergency('HELP')}
-          />
 
-          <EmergencyButton
-            label="PAIN"
-            isActive={active?.id === 'PAIN'}
-            isConfirmed={confirmedId === 'PAIN'}
-            dwellProgress={active?.id === 'PAIN' ? progress : 0}
-            onPressFallback={() => handleEmergency('PAIN')}
-          />
+        {/* ========================= */}
+        {/* Vision HUD Reticle */}
+        {/* ========================= */}
+
+        <Reticle progress={active ? progress : 0} />
+
+
+        {/* ========================= */}
+        {/* Emergency Control Panel */}
+        {/* ========================= */}
+
+        <View style={styles.panel}>
+
+          {/* Row 1 */}
+
+          <View style={styles.row}>
+
+            <EmergencyButton
+              label="HELP"
+              isActive={active?.id === 'HELP'}
+              isConfirmed={confirmedId === 'HELP'}
+              dwellProgress={active?.id === 'HELP' ? progress : 0}
+              onPressFallback={() => handleEmergency('HELP')}
+            />
+
+            <EmergencyButton
+              label="EMERGENCY"
+              isActive={active?.id === 'EMERGENCY'}
+              isConfirmed={confirmedId === 'EMERGENCY'}
+              dwellProgress={active?.id === 'EMERGENCY' ? progress : 0}
+              onPressFallback={() => handleEmergency('EMERGENCY')}
+            />
+
+            <EmergencyButton
+              label="PAIN"
+              isActive={active?.id === 'PAIN'}
+              isConfirmed={confirmedId === 'PAIN'}
+              dwellProgress={active?.id === 'PAIN' ? progress : 0}
+              onPressFallback={() => handleEmergency('PAIN')}
+            />
+
+          </View>
+
+
+          {/* Row 2 */}
+
+          <View style={styles.rowCenter}>
+
+            <EmergencyButton
+              label="WATER"
+              isActive={active?.id === 'WATER'}
+              isConfirmed={confirmedId === 'WATER'}
+              dwellProgress={active?.id === 'WATER' ? progress : 0}
+              onPressFallback={() => handleEmergency('WATER')}
+            />
+
+            <EmergencyButton
+              label="FOOD"
+              isActive={active?.id === 'FOOD'}
+              isConfirmed={confirmedId === 'FOOD'}
+              dwellProgress={active?.id === 'FOOD' ? progress : 0}
+              onPressFallback={() => handleEmergency('FOOD')}
+            />
+
+          </View>
+
         </View>
 
-        {/* Selection Circle Overlay */}
-        <View style={styles.overlay} pointerEvents="none">
-          <View
-            style={[
-              styles.selectionZone,
-              {
-                left: selectionCenter.x - SELECTION_RADIUS,
-                top: selectionCenter.y - SELECTION_RADIUS,
-                width: SELECTION_RADIUS * 2,
-                height: SELECTION_RADIUS * 2,
-              },
-            ]}
-          />
-        </View>
       </View>
+
     </SafeAreaView>
+
   );
+
 }
 
+
+
 const styles = StyleSheet.create({
+
   safeArea: {
     flex: 1,
-    backgroundColor: '#0a0f1d',
+    backgroundColor: '#020617',
   },
+
+
+  /**
+   * Header
+   */
   headerContainer: {
-    paddingBottom: 20,
+
+    position: 'absolute',
+
+    width: '100%',
+
     alignItems: 'center',
-    backgroundColor: '#0a0f1d',
+
+    zIndex: 50,
+
   },
-  branding: {
+
+
+  headerGlass: {
+
+    backgroundColor: 'rgba(15,23,42,0.55)',
+
+    borderRadius: 22,
+
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+
     alignItems: 'center',
+
+    borderWidth: 0.6,
+    borderColor: 'rgba(255,255,255,0.18)',
+
   },
+
+
   title: {
-    color: '#ffffff',
+
+    color: '#e2e8f0',
+
     fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+
+    fontWeight: '700',
+
+    letterSpacing: 0.6,
+
   },
+
+
   statusRow: {
+
     flexDirection: 'row',
+
     alignItems: 'center',
-    marginTop: 2,
+
+    marginTop: 4,
+
   },
+
+
   greenDot: {
+
     width: 6,
     height: 6,
+
     borderRadius: 3,
+
     backgroundColor: '#22c55e',
+
     marginRight: 6,
+
   },
+
+
   statusText: {
+
     color: '#22c55e',
-    fontSize: 10,
+
+    fontSize: 11,
+
     fontWeight: '700',
-    textTransform: 'uppercase',
+
+    letterSpacing: 1,
+
   },
+
+
+  /**
+   * Camera Layer
+   */
+
   cameraWrapper: {
+
     flex: 1,
-    backgroundColor: '#000',
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    overflow: 'hidden',
+
   },
-  buttonOverlayContainer: {
+
+
+  /**
+   * Emergency Panel
+   */
+
+  panel: {
+
     position: 'absolute',
-    top: 20,
-    left: 20,
-    right: 20,
+
+    top: 110,
+
+    left: 16,
+    right: 16,
+
+    backgroundColor: 'rgba(15,23,42,0.82)',
+
+    borderRadius: 26,
+
+    padding: 18,
+
+    borderWidth: 0.6,
+    borderColor: 'rgba(255,255,255,0.1)',
+
+  },
+
+
+  row: {
+
     flexDirection: 'row',
+
     justifyContent: 'space-between',
+
+    marginBottom: 14,
+
   },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  selectionZone: {
-    position: 'absolute',
-    borderRadius: 999,
-    borderWidth: 2,
-    borderColor: '#3b82f6',
-  },
-  permissionPlaceholder: {
-    flex: 1,
+
+
+  rowCenter: {
+
+    flexDirection: 'row',
+
     justifyContent: 'center',
+
+    gap: 12,
+
+  },
+
+
+  permissionPlaceholder: {
+
+    flex: 1,
+
+    justifyContent: 'center',
+
     alignItems: 'center',
+
   },
+
+
   placeholderText: {
-    color: '#ffffff',
-    fontSize: 14,
+
+    color: '#cbd5e1',
+
   },
+
 });
