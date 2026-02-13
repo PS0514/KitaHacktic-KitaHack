@@ -1,9 +1,5 @@
 // src/logic/geminiService.ts
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GEMINI_API_KEY } from "@env";
-
-// Replace with your actual API Key for the hackathon
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 const SYSTEM_INSTRUCTION = `
   You are an assistive communication AI for a patient with limited speech.
@@ -18,18 +14,43 @@ const SYSTEM_INSTRUCTION = `
 
 export async function generatePatientPhrases(keyword: string): Promise<string[]> {
   try {
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash-lite",
-      generationConfig: { responseMimeType: "application/json" }
+    // We use the REST API endpoint directly to avoid React Native Node.js conflicts
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
+
+    const requestBody = {
+      systemInstruction: {
+        parts: [{ text: SYSTEM_INSTRUCTION }]
+      },
+      contents: [
+        {
+          parts: [{ text: `Keyword: ${keyword}` }]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: "application/json"
+      }
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
     });
 
-    const prompt = `Keyword: ${keyword}`;
-    const result = await model.generateContent([SYSTEM_INSTRUCTION, prompt]);
-    const response = await result.response;
-    const text = response.text();
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Extract the text from the Gemini response structure
+    const text = data.candidates[0].content.parts[0].text;
 
     // Parse the JSON array from Gemini
     return JSON.parse(text);
+
   } catch (error) {
     console.error("Gemini Error:", error);
     // Fallback phrases if API fails or rate limits hit
