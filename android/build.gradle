@@ -1,6 +1,7 @@
 buildscript {
     ext {
-        buildToolsVersion = "36.0.0"
+        // These versions are optimized for React Native 0.75+ and Vision Camera v4
+        buildToolsVersion = "35.0.0"
         minSdkVersion = 26
         compileSdkVersion = 35
         targetSdkVersion = 35
@@ -12,11 +13,25 @@ buildscript {
         mavenCentral()
     }
     dependencies {
+        // Updated to 8.6.0 to support the 16KB page size requirement for Android 15
         classpath("com.android.tools.build:gradle:8.6.0")
         classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+
+        // This is essential for Google AI (ML Kit) unbundled models
+        classpath("com.google.gms:google-services:4.4.2")
+
+
     }
 }
 
 apply plugin: "com.facebook.react.rootproject"
 
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        // ML Kit libraries are hosted here
+        maven { url 'https://maven.google.com' }
+    }
+}
