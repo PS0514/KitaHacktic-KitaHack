@@ -1,29 +1,32 @@
-// src/logic/aiManager.ts
-
-export type Keyword = {
-  id: string;
-  label: string;
-  isDynamic: boolean;
-};
-
-const STATIC_KEYWORDS: Keyword[] = [
-  { id: 'HELP', label: 'HELP', isDynamic: false },
-  { id: 'EMERGENCY', label: 'EMERGENCY', isDynamic: false },
-  { id: 'PAIN', label: 'PAIN', isDynamic: false },
-];
-
-/**
- * Combines static keywords with the top 2 detected objects
- * @param detectedObjects Array of labels from CV Dev (sorted by proximity/confidence)
- */
 export function getActiveKeywords(detectedObjects: string[]): Keyword[] {
-  const dynamicKeywords: Keyword[] = detectedObjects
-    .slice(0, 2)
-    .map(obj => ({
-      id: obj.toUpperCase(),
-      label: obj.toUpperCase(),
-      isDynamic: true,
-    }));
+  const STATIC_KEYWORDS: Keyword[] = [
+    { id: 'HELP', label: 'HELP', isDynamic: false },
+    { id: 'EMERGENCY', label: 'EMERGENCY', isDynamic: false },
+    { id: 'PAIN', label: 'PAIN', isDynamic: false },
+  ];
 
-  return [...STATIC_KEYWORDS, ...dynamicKeywords];
+  // Map detected objects to Keywords
+  const dynamicFromCV = detectedObjects.map(obj => ({
+    id: obj.toUpperCase(),
+    label: obj.toUpperCase(),
+    isDynamic: true,
+  }));
+
+  // Create a 5-slot array: [Static, Static, Static, Dynamic, Dynamic]
+  const finalKeywords = [...STATIC_KEYWORDS];
+
+  // Fill slots 4 and 5 with detected objects, or "WAITING..." placeholders
+  for (let i = 0; i < 2; i++) {
+    if (dynamicFromCV[i]) {
+      finalKeywords.push(dynamicFromCV[i]);
+    } else {
+      finalKeywords.push({
+        id: `EMPTY_${i}`,
+        label: 'SCANNING...',
+        isDynamic: true
+      });
+    }
+  }
+
+  return finalKeywords;
 }

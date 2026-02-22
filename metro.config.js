@@ -1,5 +1,8 @@
 const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
 
+const defaultConfig = getDefaultConfig(__dirname);
+const { assetExts, sourceExts } = defaultConfig.resolver;
+
 /**
  * Metro configuration
  * https://reactnative.dev/docs/metro
@@ -8,10 +11,13 @@ const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
  */
 const config = {
   resolver: {
-    // This tells Metro to prefer the 'browser' and 'react-native'
-    // versions of libraries instead of the 'node' versions.
+    // Keeps your existing browser/node resolution fixes
     unstable_conditionNames: ['browser', 'require', 'react-native'],
+
+    // Adds 'tflite' to the list of assets Metro can bundle
+    assetExts: [...assetExts, 'tflite'],
+    sourceExts: [...sourceExts],
   },
 };
 
-module.exports = mergeConfig(getDefaultConfig(__dirname), config);
+module.exports = mergeConfig(defaultConfig, config);

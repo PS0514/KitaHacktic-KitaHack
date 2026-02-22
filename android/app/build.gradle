@@ -1,3 +1,7 @@
+project.ext.react = [
+        enableHermes: true,
+]
+
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
@@ -84,6 +88,10 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        ndk {
+            // Forces 64-bit libraries for physical devices like your Reno 10
+            abiFilters "arm64-v8a"
+        }
     }
     signingConfigs {
         debug {
