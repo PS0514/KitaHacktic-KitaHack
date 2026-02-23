@@ -22,7 +22,7 @@ import {
 // AI and Performance plugins
 import { useTensorflowModel } from 'react-native-fast-tflite';
 import { useResizePlugin } from 'vision-camera-resize-plugin';
-import { runOnJS, Worklets } from 'react-native-worklets-core';
+import {Worklets } from 'react-native-worklets-core';
 
 // Internal Components
 import { EmergencyButton } from '../components/EmergencyButton';
@@ -44,7 +44,6 @@ import Video from 'react-native-video';
 type ScanMode = 'IDLE' | 'SCANNING_OPTIONS' | 'LOADING_GEMINI' | 'SCANNING_SENTENCES';
 
 const HEADER_HEIGHT = 74;
-
 const arraysEqual = (a: string[], b: string[]) =>
   a.length === b.length && a.every((val, index) => val === b[index]);
 
@@ -70,6 +69,7 @@ export function CameraScreen() {
   const [geminiSentences, setGeminiSentences] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
 
   // 3. Switch Scanning Logic
   const currentKeywords = getActiveKeywords(detectedFromCV);
@@ -82,7 +82,7 @@ export function CameraScreen() {
 
   // 4. Load TFLite Model
   const model = useTensorflowModel(require('../assets/model.tflite'));
-  const updateLabelsJS = Worklets.createRunOnJS((newLabels: string[], newResults: any[]) => {
+  const syncStateToJS = Worklets.createRunOnJS((newLabels: string[], newResults: any[]) => {
       // This runs on the Main JS Thread
       setDetections(newResults);
       setDetectedFromCV(prev => {
@@ -96,7 +96,7 @@ export function CameraScreen() {
       'worklet';
       if (model.state !== 'loaded' || !model.model) return;
 
-      runAtTargetFps(3, () => {
+      runAtTargetFps(2, () => {
         'worklet';
         try {
           const activeModel = model.model;
@@ -113,7 +113,7 @@ export function CameraScreen() {
             const labels = results.map(d => d.label);
 
             // 3. Call the bridge instead of raw runOnJS
-            updateLabelsJS(labels, results);
+            syncStateToJS(labels, results);
           }
         } catch (e) {
           console.log("Inference Error:", e);
@@ -126,6 +126,7 @@ export function CameraScreen() {
     if (!camera.current) return;
     setIsAiAnalyzing(true);
     try {
+      await new Promise(resolve => setTimeout(resolve, 300));
       const photo = await camera.current.takePhoto();
       const aiObjects = await describeRoomWithGemini(photo.path);
       setDetectedFromCV(prev => [...new Set([...prev, ...aiObjects])]);
@@ -287,11 +288,12 @@ if (permissionStatus === 'loading' || device == null) {
                   // FORCE TRUE to open webcam immediately on launch
                   isActive={hasPermission && permissionStatus === 'granted'}
                   // Only attach the processor when the user clicks "Start Scanning"
-                  frameProcessor={scanMode === 'SCANNING_OPTIONS' ? frameProcessor : undefined}
+                  //frameProcessor={scanMode === 'SCANNING_OPTIONS' ? frameProcessor : undefined}
+                  frameProcessor={(!isCapturing && scanMode === 'SCANNING_OPTIONS') ? frameProcessor : undefined}
                   pixelFormat="yuv"
                   photo={true}
                   onInitialized={() => console.log("Camera Hardware Linked!")}
-                  onError={(e) => runOnJS(console.error)("Hardware Error:", e)}
+                  onError={(e) => Worklets.runOnJS(console.error)("Hardware Error:", e)}
                 />
 
 {/* UI indicator to tell the user the camera is warming up */}
@@ -311,7 +313,7 @@ if (permissionStatus === 'loading' || device == null) {
                 {/* Render Detection Bounding Boxes */}
                 {detections.map((d, i) => (
                   <View
-                    key={i}
+                    key={`box-${d.label}-${i}`}
                     style={[styles.cvBox, {
                       top: `${d.box[0] * 100}%`,
                       left: `${d.box[1] * 100}%`,
