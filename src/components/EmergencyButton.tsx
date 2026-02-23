@@ -107,7 +107,7 @@ export function EmergencyButton({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    marginHorizontal: 6, // Add spacing between buttons
+    marginHorizontal: 4, // Add spacing between buttons
   },
 
   containerScanning: {
@@ -121,6 +121,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 4,
   },
 
   icon: {
@@ -128,13 +129,13 @@ const styles = StyleSheet.create({
   },
 
   text: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
 
   textHighContrast: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '900', // Extra bold for readability
     textTransform: 'uppercase',
   },
